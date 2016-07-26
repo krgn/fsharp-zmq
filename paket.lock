@@ -1,5 +1,5 @@
 NUGET
   remote: https://www.nuget.org/api/v2
-  specs:
-    FAKE (4.35.0)
+    FAKE (4.35)
     FSharp.Core (4.0.0.1)
+    ZeroMQ (4.1.0.21)
