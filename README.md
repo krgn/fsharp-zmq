@@ -13,3 +13,16 @@ threads while still guaranteeing that all sockets get closed an disposed of prop
 
 The demo I cooked up in this repository makes heavy use of `AutoResetEvent` signaling and a single
 locking step to synchronize yet another background thread which in turn owns the ZeroMQ socket. 
+
+Take a [look at the source to see how its done.](https://github.com/krgn/fsharp-zmq/blob/master/zmq.tests/zmq.tests.fs)
+
+# Usage
+
+Build the thing using `Fake` like this:
+
+```
+./build.sh # or .\build.cmd on windows
+```
+
+Then start the program in your console and type-in how many random numbers you want to compute the
+square of. Thats it. 
