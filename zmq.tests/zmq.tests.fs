@@ -37,9 +37,10 @@ let isConsistent (i,res) =
 type RepSrv (addr: string) =
 
   let mutable run = true
-  let mutable ctx : ZContext = null
-  let mutable sock : ZSocket = null
-  let mutable thread : Thread = null
+  let mutable ctx: ZContext = null
+  let mutable sock: ZSocket = null
+  let mutable thread: Thread = null
+  let mutable stopper: AutoResetEvent = null
 
   let worker () =
     log "server" "start"
@@ -71,11 +72,14 @@ type RepSrv (addr: string) =
     sock.Close()
     sock.Dispose()
     ctx.Dispose()
-    log "server" "done"
+    stopper.Set() |> ignore
+
+  do stopper <- new AutoResetEvent(false)
 
   member self.Stop () =
     log "server" "stop"
     run <- false
+    stopper.WaitOne() |> ignore
 
   member self.Start () =
     let t = new Thread(new ThreadStart(worker))
@@ -91,6 +95,7 @@ type RepSrv (addr: string) =
 
 type ReqClient(addr: string) =
 
+  let mutable stopper:   AutoResetEvent = null
   let mutable requester: AutoResetEvent = null
   let mutable responder: AutoResetEvent = null
 
@@ -117,7 +122,7 @@ type ReqClient(addr: string) =
 
     while run do
       try
-        requester.WaitOne()
+        requester.WaitOne() |> ignore
         if run then
           let frame = new ZFrame(request)
           sock.Send(frame)
@@ -135,11 +140,12 @@ type ReqClient(addr: string) =
     sock.Close()
     sock.Dispose()
     ctx.Dispose()
-    log "client" "done"
+    stopper.Set() |> ignore
 
   do
     requester <- new AutoResetEvent(false)
     responder <- new AutoResetEvent(false)
+    stopper   <- new AutoResetEvent(false)
 
   member self.Start() =
     let t = new Thread(new ThreadStart(worker))
@@ -149,13 +155,14 @@ type ReqClient(addr: string) =
   member self.Stop() =
     log "client" "stop"
     run <- false
-    requester.Set()
+    requester.Set() |> ignore
+    stopper.WaitOne() |> ignore
 
   member self.Request(req: int) : int =
     lock lokk  (fun _ ->
       request <- req
-      requester.Set()
-      responder.WaitOne()
+      requester.Set() |> ignore
+      responder.WaitOne() |> ignore
       response)
 
 //                  _
@@ -188,8 +195,8 @@ let main argv =
             yield rand.Next(0, 256)
           ]
 
-        sprintf "requesting results for: %A" nums
-        |> log "client"
+        sprintf "requesting results for %d items" num
+        |> log "main"
 
         let request n  =
           async {
@@ -206,8 +213,8 @@ let main argv =
         |> Async.RunSynchronously
         |> withlog "consistency check done"
         |> Array.fold (fun m v -> if not m then m else v) true
-        |> sprintf "Results OK: %b"
-        |> log "client"
+        |> sprintf "results ok: %b"
+        |> log "main"
       with
         | _ -> ()
     else
@@ -217,11 +224,7 @@ let main argv =
       sprintf "[%A before] [%A after] [%A freed]" before after (before - after)
       |> log "main"
 
-  log "main" "stop worker"
-
   client.Stop()
   srv.Stop()
-
-  Thread.Sleep(1000)
 
   0

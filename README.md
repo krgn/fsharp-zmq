@@ -9,7 +9,7 @@ change:
 
 Until these new, thread-safe socket types land in a proper release and get integrated into the
 `.NET` `ZeroMQ` package I need a solution to allow me to pass around and use sockets on different
-threads while still guaranteeing that all sockets get closed an disposed properly.
+threads while still guaranteeing that all sockets get closed an disposed of properly.
 
-The solution I cooked up in this repository makes use of `AutoResetEvent` signaling and a single
-locking step to synchronize yet another background thread which in turn owns the ZeroMQ socket.
+The demo I cooked up in this repository makes heavy use of `AutoResetEvent` signaling and a single
+locking step to synchronize yet another background thread which in turn owns the ZeroMQ socket. 
