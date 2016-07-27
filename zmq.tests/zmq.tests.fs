@@ -13,6 +13,10 @@ let log tag msg =
   let tid = Thread.CurrentThread.ManagedThreadId
   printfn "[%d / %d / %s] %s" (unixtime now) tid tag msg
 
+let withlog msg t =
+  log "main" msg
+  t
+
 //  ____           ____
 // |  _ \ ___ _ __/ ___| _ ____   __
 // | |_) / _ \ '_ \___ \| '__\ \ / /
@@ -20,15 +24,22 @@ let log tag msg =
 // |_| \_\___| .__/____/|_|    \_/
 //           |_|
 
+// work
+let proc i =
+  float i ** 2.0 |> int
+
+// check if request/response are consistent
+let isConsistent (i,res) =
+  async {
+    return sqrt (float res) = float i
+  }
+
 type RepSrv (addr: string) =
 
   let mutable run = true
   let mutable ctx : ZContext = null
   let mutable sock : ZSocket = null
   let mutable thread : Thread = null
-
-  let proc i =
-    float i ** 2.0 |> int
 
   let worker () =
     log "server" "start"
@@ -169,30 +180,42 @@ let main argv =
 
   while cmd <> "stop" do
     cmd <- Console.ReadLine()
-    try
-      num <- int cmd
-      let nums = [
-        for n in 1 .. num do
-          yield rand.Next(0, 256)
-        ]
+    if cmd <> "gc" then
+      try
+        num <- int cmd
+        let nums = [
+          for n in 1 .. num do
+            yield rand.Next(0, 256)
+          ]
 
-      sprintf "requesting results for: %A" nums
-      |> log "client"
+        sprintf "requesting results for: %A" nums
+        |> log "client"
 
-      let request n  =
-        async {
-          let res = client.Request(n)
-          return (n, res)
-        }
+        let request n  =
+          async {
+            let res = client.Request(n)
+            return (n, res)
+          }
 
-      List.map request nums
-      |> Async.Parallel
-      |> Async.RunSynchronously
-      |> List.ofArray
-      |> sprintf "responses: %A"
-      |> log "client"
-    with
-      | _ -> ()
+        List.map request nums
+        |> Async.Parallel
+        |> Async.RunSynchronously
+        |> withlog "requests done"
+        |> Array.map isConsistent
+        |> Async.Parallel
+        |> Async.RunSynchronously
+        |> withlog "consistency check done"
+        |> Array.fold (fun m v -> if not m then m else v) true
+        |> sprintf "Results OK: %b"
+        |> log "client"
+      with
+        | _ -> ()
+    else
+      let before = GC.GetTotalMemory(false)
+      GC.Collect()
+      let after = GC.GetTotalMemory(true)
+      sprintf "[%A before] [%A after] [%A freed]" before after (before - after)
+      |> log "main"
 
   log "main" "stop worker"
 
