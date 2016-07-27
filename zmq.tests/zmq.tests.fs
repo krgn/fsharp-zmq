@@ -170,12 +170,26 @@ let main argv =
   while cmd <> "stop" do
     cmd <- Console.ReadLine()
     try
-      let num = int cmd
-      sprintf "requesting: %d" num
+      num <- int cmd
+      let nums = [
+        for n in 1 .. num do
+          yield rand.Next(0, 256)
+        ]
+
+      sprintf "requesting results for: %A" nums
       |> log "client"
 
-      client.Request(num)
-      |> sprintf "response: %d"
+      let request n  =
+        async {
+          let res = client.Request(n)
+          return (n, res)
+        }
+
+      List.map request nums
+      |> Async.Parallel
+      |> Async.RunSynchronously
+      |> List.ofArray
+      |> sprintf "responses: %A"
       |> log "client"
     with
       | _ -> ()
