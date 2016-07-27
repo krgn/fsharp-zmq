@@ -50,12 +50,12 @@ type RepSrv (addr: string) =
   let mutable starter: AutoResetEvent = null
   let mutable stopper: AutoResetEvent = null
 
-  let worker () =                       // worker function for processing requests
-    if isNull ctx then                  // if the context is null, create it please
+  let worker () =                                           // worker function for processing requests
+    if isNull ctx then                                      // if the context is null, create it please
       ctx <- new ZContext()
 
-    if isNull sock then                              // if the socket is null
-      let socket = new ZSocket(ctx, ZSocketType.REP) // create it
+    if isNull sock then                                     // if the socket is null
+      let socket = new ZSocket(ctx, ZSocketType.REP)        // create it
       socket.SetOption(ZSocketOption.RCVTIMEO, 50) |> ignore // set this for the socket to periodically time out, such that the request loop can be interupted
       socket.Bind(addr)                                     // bind to address
       sock <- socket                                         // and safe for later use
@@ -63,35 +63,35 @@ type RepSrv (addr: string) =
 
     while run do
       try
-        let frame = sock.ReceiveFrame() // block to receive a request
-        let number = frame.ReadInt32()  // read the number as int
+        let frame = sock.ReceiveFrame()                     // block to receive a request
+        let number = frame.ReadInt32()                      // read the number as int
 
-        let reply = new ZFrame(proc number) // process the number and create a frame for response
-        sock.Send(reply)                    // send response back
+        let reply = new ZFrame(proc number)                 // process the number and create a frame for response
+        sock.Send(reply)                                    // send response back
 
-        frame.Dispose()                 // dispose of frame
-        reply.Dispose()                 // dispose of reply
+        frame.Dispose()                                     // dispose of frame
+        reply.Dispose()                                     // dispose of reply
       with
-        | :? ZException -> ()            // ReceiveFrame times out, so ignore the Exception
+        | :? ZException -> ()                                // ReceiveFrame times out, so ignore the Exception
 
-    sock.SetOption(ZSocketOption.LINGER, 0) |> ignore // loop exited, so set linger to 0
-    sock.Close()                                     // and close socket
-    sock.Dispose()                                   // dispose socket
-    ctx.Dispose()                                    // now context can also be disposed
-    stopper.Set() |> ignore                           // signal that Stop is done
+    sock.SetOption(ZSocketOption.LINGER, 0) |> ignore        // loop exited, so set linger to 0
+    sock.Close()                                            // and close socket
+    sock.Dispose()                                          // dispose socket
+    ctx.Dispose()                                           // now context can also be disposed
+    stopper.Set() |> ignore                                  // signal that Stop is done
 
   do
-    starter <- new AutoResetEvent(false) // initialise the signals
+    starter <- new AutoResetEvent(false)                     // initialise the signals
     stopper <- new AutoResetEvent(false)
 
   member self.Stop () =
-    run <- false                         // break the loop by setting this to false
-    stopper.WaitOne() |> ignore          // wait for the signal that stopping is done
+    run <- false                                             // break the loop by setting this to false
+    stopper.WaitOne() |> ignore                              // wait for the signal that stopping is done
 
   member self.Start () =
-    thread <- new Thread(new ThreadStart(worker)) // create a worker thread and save for later use
-    thread.Start()                               // start the thread
-    starter.WaitOne() |> ignore                   // wait until startup was signaled done
+    thread <- new Thread(new ThreadStart(worker))            // create a worker thread and save for later use
+    thread.Start()                                          // start the thread
+    starter.WaitOne() |> ignore                              // wait until startup was signaled done
 
 //  ____             ____ _ _            _
 // |  _ \ ___  __ _ / ___| (_) ___ _ __ | |_
@@ -118,9 +118,9 @@ type ReqClient(addr: string) =
   let lokk = new Object()
   let rand = new Random()
 
-  let worker _ =                        // function to hold the client socket
-    if isNull ctx then                  // if not yet present,
-      ctx <- new ZContext()              // initialise the ZeroMQ context for this thread
+  let worker _ =                                              // function to hold the client socket
+    if isNull ctx then                                        // if not yet present,
+      ctx <- new ZContext()                                    // initialise the ZeroMQ context for this thread
 
     if isNull sock then                                       // if not yet present
       let socket = new ZSocket(ctx, ZSocketType.REQ)          // initialise the socket
@@ -129,50 +129,50 @@ type ReqClient(addr: string) =
       sock <- socket                                           // and safe for later use
       starter.Set() |> ignore                                  // signal `starter` that startup is done
 
-    while run do                        // run for as long as `run` is set to `true`
+    while run do                                              // run for as long as `run` is set to `true`
       try
-        requester.WaitOne() |> ignore    // wait for the signal that a new request is ready (or shutdown is reuqested)
-        if run then                     // `run` is usually true, but shutdown first sets this to false to exit the loop
-          let frame = new ZFrame(request) // create a new ZFrame to send
-          sock.Send(frame)                // and send it via sock
-          let reply = sock.ReceiveFrame() // block and wait for reply frame
-          response <- reply.ReadInt32()    // read and save the response globally
-          responder.Set() |> ignore        // signal that the response is ready to be consumed
-          frame.Dispose()                 // dispose of frame
-          reply.Dispose()                 // and reply
+        requester.WaitOne() |> ignore                          // wait for the signal that a new request is ready (or shutdown is reuqested)
+        if run then                                           // `run` is usually true, but shutdown first sets this to false to exit the loop
+          let frame = new ZFrame(request)                     // create a new ZFrame to send
+          sock.Send(frame)                                    // and send it via sock
+          let reply = sock.ReceiveFrame()                     // block and wait for reply frame
+          response <- reply.ReadInt32()                        // read and save the response globally
+          responder.Set() |> ignore                            // signal that the response is ready to be consumed
+          frame.Dispose()                                     // dispose of frame
+          reply.Dispose()                                     // and reply
       with
-        | :? ZException as exn ->        // TIMEOUT might be triggered here
+        | :? ZException as exn ->                              // TIMEOUT might be triggered here
           sprintf "Request failed: %s" exn.ErrText
           |> log "client"
 
-    sock.SetOption(ZSocketOption.LINGER, 0) |> ignore // set linger to 0 to close socket quickly
-    sock.Close()                                     // close the socket
-    sock.Dispose()                                   // dispose of it
-    ctx.Dispose()                                    // dispose of the context (should not hang now)
-    stopper.Set() |> ignore                           // signal that everything was cleaned up now
+    sock.SetOption(ZSocketOption.LINGER, 0) |> ignore          // set linger to 0 to close socket quickly
+    sock.Close()                                              // close the socket
+    sock.Dispose()                                            // dispose of it
+    ctx.Dispose()                                             // dispose of the context (should not hang now)
+    stopper.Set() |> ignore                                    // signal that everything was cleaned up now
 
   do
-    starter   <- new AutoResetEvent(false) // initialize the signals
+    starter   <- new AutoResetEvent(false)                     // initialize the signals
     stopper   <- new AutoResetEvent(false)
     requester <- new AutoResetEvent(false)
     responder <- new AutoResetEvent(false)
 
   member self.Start() =
-    thread <- new Thread(new ThreadStart(worker)) // create a new Thread as context for the client socket
-    thread.Start()                               // start that thread, causing the socket to be intitialized
-    starter.WaitOne() |> ignore                   // wait for the `starter` signal to indicate startup is done
+    thread <- new Thread(new ThreadStart(worker))              // create a new Thread as context for the client socket
+    thread.Start()                                            // start that thread, causing the socket to be intitialized
+    starter.WaitOne() |> ignore                                // wait for the `starter` signal to indicate startup is done
 
   member self.Stop() =
-    run <- false                         // stop the loop from iterating
-    requester.Set() |> ignore            // but signal requester one more time to exit loop
-    stopper.WaitOne() |> ignore          // wait for the stopper to signal that everything was disposed
+    run <- false                                               // stop the loop from iterating
+    requester.Set() |> ignore                                  // but signal requester one more time to exit loop
+    stopper.WaitOne() |> ignore                                // wait for the stopper to signal that everything was disposed
 
-  member self.Request(req: int) : int = // synchronously request the square of `req`
-    lock lokk  (fun _ ->                   // lock on the `lokk` object while executing this transaction
-      request <- req                     // first set the requets
-      requester.Set() |> ignore          // then signal a request is ready for execution
-      responder.WaitOne() |> ignore      // wait for signal from the responder that execution has finished
-      response)                         // return the response
+  member self.Request(req: int) : int =                       // synchronously request the square of `req`
+    lock lokk  (fun _ ->                                         // lock on the `lokk` object while executing this transaction
+      request <- req                                           // first set the requets
+      requester.Set() |> ignore                                // then signal a request is ready for execution
+      responder.WaitOne() |> ignore                            // wait for signal from the responder that execution has finished
+      response)                                               // return the response
 
 //                  _
 //  _ __ ___   __ _(_)_ __
